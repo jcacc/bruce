@@ -168,6 +168,9 @@ volatile int tftHeight = TFT_WIDTH;
 #include "core/sd_functions.h"
 #include "core/serialcmds.h"
 #include "core/settings.h"
+#if !defined(LITE_VERSION)
+#include "core/sharebruce_splash.h"
+#endif
 #include "core/wifi/webInterface.h"
 #include "core/wifi/wifi_common.h"
 #include "modules/bjs_interpreter/interpreter.h" // for JavaScript interpreter
@@ -274,7 +277,7 @@ void boot_screen() {
     tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
     tft.setTextSize(FM);
     tft.drawPixel(0, 0, bruceConfig.bgColor);
-    tft.drawCentreString("Bruce", tftWidth / 2, 10, 1);
+    tft.drawCentreString("shareBruce", tftWidth / 2, 10, 1);
     tft.setTextSize(FP);
     tft.drawCentreString(BRUCE_VERSION, tftWidth / 2, 25, 1);
     tft.setTextSize(FM);
@@ -301,11 +304,25 @@ void boot_screen_anim() {
     else if (boot_img == 0 && LittleFS.exists("/boot.gif")) boot_img = 4;
     if (bruceConfig.theme.boot_img) boot_img = 5; // override others
 
-    tft.drawPixel(0, 0, 0);       // Forces back communication with TFT, to avoid ghosting
-                                  // Start image loop
+    tft.drawPixel(0, 0, 0); // Forces back communication with TFT, to avoid ghosting
+#if !defined(LITE_VERSION)
+    // shareBruce splash: shown under the title unless a custom boot image overrides it
+    if (!boot_img) {
+        bool swapBytes = tft.getSwapBytes();
+        tft.setSwapBytes(true);
+        tft.pushImage(
+            (tftWidth - sharebruce_splash_width) / 2,
+            45 + (tftHeight - 45 - sharebruce_splash_height) / 2,
+            sharebruce_splash_width,
+            sharebruce_splash_height,
+            sharebruce_splash
+        );
+        tft.setSwapBytes(swapBytes);
+    }
+#endif
+    // Start image loop
     while (millis() < i + 7000) { // boot image lasts for 5 secs
         if ((millis() - i > 2000) && !drawn) {
-            tft.fillRect(0, 45, tftWidth, tftHeight - 45, bruceConfig.bgColor);
             if (boot_img > 0 && !drawn) {
                 tft.fillScreen(bruceConfig.bgColor);
                 if (boot_img == 5) {
@@ -335,33 +352,6 @@ void boot_screen_anim() {
             }
             drawn = true;
         }
-#if !defined(LITE_VERSION)
-        if (!boot_img && (millis() - i > 2200) && (millis() - i) < 2700)
-            tft.drawRect(2 * tftWidth / 3, tftHeight / 2, 2, 2, bruceConfig.priColor);
-        if (!boot_img && (millis() - i > 2700) && (millis() - i) < 2900)
-            tft.fillRect(0, 45, tftWidth, tftHeight - 45, bruceConfig.bgColor);
-        if (!boot_img && (millis() - i > 2900) && (millis() - i) < 3400)
-            tft.drawXBitmap(
-                2 * tftWidth / 3 - 30,
-                5 + tftHeight / 2,
-                bruce_small_bits,
-                bruce_small_width,
-                bruce_small_height,
-                bruceConfig.bgColor,
-                bruceConfig.priColor
-            );
-        if (!boot_img && (millis() - i > 3400) && (millis() - i) < 3600) tft.fillScreen(bruceConfig.bgColor);
-        if (!boot_img && (millis() - i > 3600))
-            tft.drawXBitmap(
-                (tftWidth - 238) / 2,
-                (tftHeight - 133) / 2,
-                bits,
-                bits_width,
-                bits_height,
-                bruceConfig.bgColor,
-                bruceConfig.priColor
-            );
-#endif
         if (check(AnyKeyPress)) // If any key or M5 key is pressed, it'll jump the boot screen
         {
             tft.fillScreen(bruceConfig.bgColor);
