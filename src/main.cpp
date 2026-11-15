@@ -12,6 +12,7 @@
 #include "esp_task_wdt.h"
 #include "esp_wifi.h"
 #include <functional>
+#include <mbedtls/platform.h>
 #include <string>
 #include <vector>
 // Native RF decoding runs beneath the menu callbacks on loopTask. The default
@@ -441,6 +442,23 @@ void startup_sound() {
 #endif
 }
 
+#if defined(MBEDTLS_PLATFORM_MEMORY) && !defined(MBEDTLS_PLATFORM_CALLOC_MACRO)
+// The prebuilt SDK pins mbedTLS to internal RAM (CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC).
+// A TLS session needs two ~17 kB record buffers; with Wi-Fi up the internal heap is
+// too fragmented for that, so every HTTPS connection failed with "SSL - Memory
+// allocation failed" while megabytes of PSRAM sat idle. Large TLS allocations go to
+// PSRAM instead; small ones stay internal (faster), spilling over when it is full.
+static constexpr size_t TLS_PSRAM_MIN_ALLOC = 1024;
+
+static void *tlsCallocPreferPsram(size_t count, size_t size) {
+    const uint32_t psram = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
+    const uint32_t internal = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+    // Overflow in count * size only picks the preferred pool; heap_caps_calloc rejects it.
+    if (count * size >= TLS_PSRAM_MIN_ALLOC) return heap_caps_calloc_prefer(count, size, 2, psram, internal);
+    return heap_caps_calloc_prefer(count, size, 2, internal, psram);
+}
+#endif
+
 /*********************************************************************
  **  Function: setup
  **  Where the devices are started and variables set
@@ -467,6 +485,10 @@ void setup() {
         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)
     );
     Serial.flush();
+
+#if defined(MBEDTLS_PLATFORM_MEMORY) && !defined(MBEDTLS_PLATFORM_CALLOC_MACRO)
+    if (psramFound()) mbedtls_platform_set_calloc_free(tlsCallocPreferPsram, heap_caps_free);
+#endif
 
     RAM_LOG("setup-start");
 
