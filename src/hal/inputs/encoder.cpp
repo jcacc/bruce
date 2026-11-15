@@ -63,7 +63,19 @@ void hal_encoder_poll(const DeviceEncoder &cfg) {
     bool esc = cfg.pin_esc >= 0 && digitalRead(cfg.pin_esc) == LOW;
 
     if (posDifference != 0 || sel || esc) {
-        if (!wakeUpScreen()) AnyKeyPress = true;
+        // wakeUpScreen() clears the dimmer / screen-off state and returns true
+        // when it did so; normally that first press is "used up" just to wake the
+        // screen (hence the early return). But setSleepMode() parks in a loop that
+        // waits solely on AnyKeyPress with the watchdogs disabled, so if the press
+        // is swallowed here the device hangs until a manual reset. While isSleeping
+        // we therefore always raise AnyKeyPress (and consume the press) so Sleep
+        // Mode can exit; sleepModeOff() then powers the panel back on.
+        bool wokeScreen = wakeUpScreen();
+        if (isSleeping) {
+            AnyKeyPress = true;
+            return;
+        }
+        if (!wokeScreen) AnyKeyPress = true;
         else return;
     }
     if (posDifference > 0) {
