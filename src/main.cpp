@@ -315,7 +315,8 @@ void boot_screen_anim() {
             45 + (tftHeight - 45 - sharebruce_splash_height) / 2,
             sharebruce_splash_width,
             sharebruce_splash_height,
-            sharebruce_splash
+            sharebruce_splash,
+            sharebruce_splash_transp // transparent colour key: skip background pixels
         );
         tft.setSwapBytes(swapBytes);
     }
