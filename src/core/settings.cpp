@@ -239,7 +239,7 @@ void setSleepMode() {
             returnToMenu = true;
             break;
         }
-        vTaskDelay(pdMS_TO_TICKS(1));
+        vTaskDelay(pdMS_TO_TICKS(10)); // yields, so the idle-task watchdogs keep being fed
     }
 }
 
