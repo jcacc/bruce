@@ -455,8 +455,11 @@ void BruceConfig::saveFile() {
         return;
     };
 
-    // Serialize JSON to file
-    serializeJsonPretty(jsonDoc, Serial);
+    // Serialize JSON to file.
+    // Do not also dump the config to Serial here: on native-USB boards each small
+    // write stalls for seconds when the port is plugged into a host that is not
+    // reading it, and saveFile() runs on the WebUI's async_tcp task at login (to
+    // store the session token), which froze the WebUI right after logging in.
     if (serializeJsonPretty(jsonDoc, file) < 5) log_e("Failed to write config file");
     else log_i("config file written successfully");
 
